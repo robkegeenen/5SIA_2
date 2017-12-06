@@ -91,7 +91,7 @@ void gpu_average(int32_t *x, float *y)
 
         //store the final average to global memory y[0]
         //This result will be fetched by the CPU later
-        y[0]=avg;
+        y[0]= avg;
     }
 
     //this will return the control to the CPU once all threads finish (reach this point)
@@ -167,36 +167,51 @@ void stafeature(int np, int32_t *x, float *sta)
      *  Finally the sums of all the blocks are added by a single thread, and divided by the total number of elements to obtain the average
     */
 
+
     //NOTE: take care np is a multiple of numBlocks for this example
     int numBlocks=4;
     int threadsPerBlock=np/numBlocks; //i.e., this should have remainder==0
 
+    //variable for holding return values of cuda functions
+    cudaError_t err;
+
     //start by allocating room for array "x" on the global memory of the GPU
     int32_t* device_x;
-    cudaMalloc(&device_x, np*sizeof(int32_t));
+    err=cudaMalloc(&device_x, np*sizeof(int32_t));
+
+    //Here we check for errors of this cuda call
+    //See eeg.h for the implementation of this error check (it's not a cuda default function)
+    cudaCheckError(err);
 
     //also allocate room for the answer
     float* device_y;
     //Note that room is allocated in global memory for the sum of *each* threadblock
     //The final result will however be stored in the first position of this array
-    cudaMalloc(&device_y, numBlocks*sizeof(float));
+    err=cudaMalloc(&device_y, numBlocks*sizeof(float));
+    cudaCheckError(err);
 
     //Now copy array "x" from the CPU to the GPU
-    cudaMemcpy(device_x,x, np*sizeof(int32_t), cudaMemcpyHostToDevice);
+    err=cudaMemcpy(device_x,x, np*sizeof(int32_t), cudaMemcpyHostToDevice);
+    cudaCheckError(err);
 
     //Compute the average on the GPU
     gpu_average<<<numBlocks,threadsPerBlock>>>(device_x, device_y);
+    //We use "peekatlasterror" since a kernel launch does not return a cudaError_t
+    cudaCheckError(cudaPeekAtLastError());
 
     //copy result from GPU global memory to CPU memory
     float avg;
     //NOTE: we only copy back the first element of the y array, since this hold the final average
-    cudaMemcpy(&avg,device_y, 1*sizeof(float), cudaMemcpyDeviceToHost);
+    err=cudaMemcpy(&avg,device_y, 1*sizeof(float), cudaMemcpyDeviceToHost);
+    cudaCheckError(err);
 
     //free the memory on the GPU
     //Hint: if you do not free the memory, the values will be preserved between multiple kernel calls!
     //For example, you could keep the calculated average in GPU memory, and use it in the calculation of stdev on the GPU
-    cudaFree(device_x);
-    cudaFree(device_y);
+    err=cudaFree(device_x);
+    cudaCheckError(err);
+    err=cudaFree(device_y);
+    cudaCheckError(err);
 
     //calculate all other features on the CPU for now
     sta[0] = avg;

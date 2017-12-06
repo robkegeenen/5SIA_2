@@ -22,7 +22,9 @@ int main(int argc, char *argv[]) {
     read_data(x, CHANNELS, DATAPOINTS);
 
     for (i = 0; i < CHANNELS; i++) {
+        #ifdef VERBOSE
         printf("Running channel %d...\n", i);
+        #endif
         run_channel(DATAPOINTS, x[i], features[i]);
     }
 
@@ -80,25 +82,43 @@ void run_channel(int np, int32_t *x, float *features)
 	int32_t *X = (int32_t *) malloc((np + 1) * sizeof(int32_t));
 
     // Clean signal using butterworth
+    #ifdef VERBOSE
     printf("    Butterworth filter...\n");
     bw0_int(np, x, X);
+    #endif
 
     // 4 features: mean, std dev, abs sum, mean crossings
+    #ifdef VERBOSE
     printf("    Standard features...\n");
+    #endif
     stafeature(np, X, &features[0]);
+
     // 2 features: mean p2p, std dev p2p
+    #ifdef VERBOSE
     printf("    Peak 2 peak features...\n");
+    #endif
     p2p(np, X, &features[4], 7);
+
     // 1 feature: aproximate entropy
+    #ifdef VERBOSE
     printf("    Aproximate Entropy feature...\n");
+    #endif
     apen(np, X, &features[6], 3, 0.2);
+
     // 1 feature: hurst coefficient
+    #ifdef VERBOSE
     printf("    Hurst Coefficient feature...\n");
+    #endif
     hurst(np, X, &features[7]);
+
     // 6 features: power in 5 frequency bands & total power
+    #ifdef VERBOSE
     printf("    Power Spectral Density features...\n");
+    #endif
     power_per_band(np, X, &features[8]);
 
+    #ifdef VERBOSE
     printf("Channel done\n");
+    #endif
     free(X);
 }
