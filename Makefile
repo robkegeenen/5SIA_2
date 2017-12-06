@@ -46,8 +46,8 @@ EXTRA_LDFLAGS   ?=
 CFLAGS=-O3 -Wall
 
 # CUDA code generation flags
-GENCODE_SM10    := -gencode arch=compute_10,code=sm_10 -Wno-deprecated-gpu-targets
-GENCODE_SM20    := -gencode arch=compute_20,code=sm_20 -Wno-deprecated-gpu-targets
+GENCODE_SM10    := -Wno-deprecated-gpu-targets -gencode arch=compute_10,code=sm_10
+GENCODE_SM20    := -Wno-deprecated-gpu-targets -gencode arch=compute_20,code=sm_20
 GENCODE_SM30    := -gencode arch=compute_30,code=sm_30
 
 #NOTE: Set this based on your device!!
@@ -127,6 +127,6 @@ clean:
 
 zip:$(USER).zip
 $(USER).zip:clean
-	zip $(USER).zip ./* -x -q
+	zip $(USER).zip ./* -x EEG.csv -x reference.txt
 
 -include $(DEPEND)
