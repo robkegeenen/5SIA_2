@@ -26,8 +26,9 @@ float average(int np, int32_t *x)
 }
 
 __global__
-void gpu_average(int32_t *x, int32_t *y)
+void gpu_average(int32_t *x, int32_t *blocksums)
 {
+    //Note that his kernel is merely an example, and is not necessarily the optimal way to calculate the sum/average on a GPU device
 
     // The id of this thread within our block
     unsigned int threadId = threadIdx.x;
@@ -42,19 +43,18 @@ void gpu_average(int32_t *x, int32_t *y)
     //printf("Hello from global thread %d, with local id %d\n",globalId,threadId);
 
     // Lets first copy the data from global GPU memory to shared memory
-    // Shared memory is only accesible within a threadblock, but it is much faster to access than global memory
+    // Shared memory is only accesible within a threadblock, but it is much faster to access than global memory once you have data in there
     // Note that by having the keyword "extern" and empty brackets [], the size of the array will be determined at runtime.
     // You will however have to pass the size in bytes as a 3rd argument to the kernel call (see the "sharedMemBytes" variable)
-    // If you statically know the size of the shared memory array, it is probably faster to use that.
-    // Because of this I would recommend using defines to calculate all these kind of sizes, although here for readability this is used
+    // If you statically know the size of the shared memory array, it is probably faster to use that (Disclaimer: I did not test this claim)
     extern __shared__ int32_t blockData[];
     blockData[threadId]=x[globalId];
 
-    // We insert a syncthreads here, to make sure every thread has copied valid data from global to local memory
+    // We synchronize the threads here, to make sure every thread has copied valid data from global to local memory
     // Otherwise we potentially risk accessing uninitialized data in the shared memory
     __syncthreads();
 
-    // The next step is summation of the elements in out blockData
+    // The next step is summation of the elements in our blockData
     // The summation is done in a tree like fashion, as illustrated below
     // 0 1 2 3 4 5 6 7  (number of parallel summations)
     // |/  |/  |/  |/   (4)
@@ -65,6 +65,7 @@ void gpu_average(int32_t *x, int32_t *y)
     // 28
     for(unsigned int s=1;s<blockDim.x;s*=2){
         // Because the amount of work reduces, we use the threadId to determine which threads get to execute the summation
+        // The other threads will idle in the meantime (They will be masked during the execution of the conditional-part)
         if (threadId % (2*s) == 0 ){
             blockData[threadId] += blockData[threadId+s];
         }
@@ -79,11 +80,11 @@ void gpu_average(int32_t *x, int32_t *y)
 
         #ifdef DEBUG
         //example debugging, print the partial sum of each block with the block id
-        printf("Sum of Block %d: %d\n",blockIdx.x, blockData[0]);
+        printf("GPU Block %d sum: %d\n",blockIdx.x, blockData[0]);
         #endif
 
-        //each block has one summation
-        y[blockIdx.x]=blockData[0];
+        //write the sum of this block to the blocksums array
+        blocksums[blockIdx.x]=blockData[0];
     }
 
     //this will return the control to the CPU once all threads finish (reach this point)
@@ -152,21 +153,21 @@ void stafeature(int np, int32_t *x, float *sta)
     //GPU code
 
     /*
-     *  Our strategy to calculate the average in parallel is to split the input array into into a number of blocks (numBlocks).
-     *  Each block contains then np/numBlocks elements
+     *  Our high level strategy to calculate the average in parallel in this example is to split the input array into into a number of blocks (numBlocks).
+     *  Each block contains thus np/numBlocks elements
      *  These blocks will be mapped to the Streaming Multiprocessors of the GPU.
-     *  For each block we calculate the sum(!) for that block
-     *  Finally the sums of all the blocks are added by a single thread, and divided by the total number of elements to obtain the average
+     *  For each block we calculate the sum
+     *  Finally the sums of all the blocks are added on the CPU
     */
 
-
-    //NOTE: take care np is a multiple of numBlocks for this example
+    //NOTE: take care np is a multiple of numBlocks for this example.
     int numBlocks=4;
     int threadsPerBlock=np/numBlocks; //i.e., this should have remainder==0
 
-    //Because in this setup the amount of required shared memory is only known at runtime,
-    //the number required shared memory bytes need to be passed as a 3rd argument to the kernel call later on
-    //also see the remarks in the gpu_average code
+    //Ignore the next bit untill you are inspecting the gpu kernel code, then refer back to it. On the first read just ignore it ;)
+    //Because in this setup the amount of required shared memory depends on np we assume it is only known at runtime. (although you can of course get it from the input and assume it fixed for this assigment)
+    //the number of required shared memory bytes need to be passed as a 3rd argument to the kernel call later on
+    //see the remarks in the gpu_average code
     int sharedMemBytes = threadsPerBlock*sizeof(int32_t);
 
     //variable for holding return values of cuda functions
@@ -177,15 +178,13 @@ void stafeature(int np, int32_t *x, float *sta)
     err=cudaMalloc(&device_x, np*sizeof(int32_t));
 
     //Here we check for errors of this cuda call
-    //See eeg.h for the implementation of this error check (it's not a cuda default function)
+    //See eeg.h for the implementation of this error check (it's not a default cuda function)
     cudaCheckError(err);
 
-    //also allocate room for the answer
+    //also allocate room for the all the sums of the blocks
     int32_t* device_blocksums;
     //Note that room is allocated in global memory for the sum of *each* threadblock
-    //The final result will however be stored in the first position of this array
-    //also, we allocate as floats here, but use as int32_t internally at some point which is not very pretty, but should work ;)
-    err=cudaMalloc(&device_blocksums, numBlocks*sizeof(float));
+    err=cudaMalloc(&device_blocksums, numBlocks*sizeof(int32_t));
     cudaCheckError(err);
 
     //Now copy array "x" from the CPU to the GPU
@@ -193,46 +192,58 @@ void stafeature(int np, int32_t *x, float *sta)
     cudaCheckError(err);
 
     //Compute the average on the GPU
-
     gpu_average<<<numBlocks,threadsPerBlock, sharedMemBytes>>>(device_x, device_blocksums);
-    //We use "peekatlasterror" since a kernel launch does not return a cudaError_t
+
+    //We use "peekatlasterror" since a kernel launch does not return a cudaError_t to check for errors
     cudaCheckError(cudaPeekAtLastError());
 
-    //copy result from GPU global memory to CPU memory
+    //copy the sums of each block back from GPU global memory to CPU memory
     int32_t blocksums[numBlocks];
-    //NOTE: we only copy back the first element of the y array, since this hold the final average
-    err=cudaMemcpy(blocksums,device_blocksums, numBlocks*sizeof(float), cudaMemcpyDeviceToHost);
+    err=cudaMemcpy(blocksums, device_blocksums, numBlocks*sizeof(int32_t), cudaMemcpyDeviceToHost);
     cudaCheckError(err);
 
-    //Now add all the block sums on the CPU
-    //if you have many blocks, you might consider mapping this to a threadblock on the GPU of course
-    int32_t sum;
-    for(uint32_t blk=0;blk<numBlocks;blk++)
-        sum+=blocksums[blk];
-    float avg = (float)(sum)/(float)(np);
-
     //free the memory on the GPU
-    //Hint: if you do not free the memory, the values will be preserved between multiple kernel calls!
-    //For example, you could keep the calculated average in GPU memory, and use it in the calculation of stdev on the GPU
+    //Optimalisation Hint: if you do not free the memory, the values will be preserved between multiple kernel calls!
+    //For example, the x-array will remain in the GPU global memory if you also map other features to the GPU
     err=cudaFree(device_x);
     cudaCheckError(err);
     err=cudaFree(device_blocksums);
     cudaCheckError(err);
 
-    printf("Average: %f\n",avg);
-    printf("CPU reference: %f\n",average(np, x));
-    int tsum=0;
+    #ifdef DEBUG
+    //print all the block sums calculated by CPU
     for(int b=0;b<numBlocks;b++){
         int sum=0;
         for (int i=0;i<threadsPerBlock;i++)
             sum+=x[b*threadsPerBlock+i];
         printf("CPU Block %d sum: %d\n",b,sum);
-        tsum+=sum;
     }
-    printf("CPU total sum: %d\n",tsum);
+    #endif
+
+    //Now add all the block sums on the CPU
+    //(Note: if you have many blocks, you might consider mapping this to another GPU call of course)
+    int32_t sum=0;
+    for(uint32_t blk=0;blk<numBlocks;blk++)
+        sum+=blocksums[blk];
+    float avg = (float)(sum)/(float)(np);
 
 
-    //calculate all other features on the CPU for now
+    #ifdef DEBUG
+    //Compare total sum of GPU and CPU
+    printf("GPU Total sum: %d\n",sum);
+    int cpu_sum=0;
+    for(int i=0;i<np;i++)
+        cpu_sum+=x[i];
+    printf("CPU Total sum: %d\n",cpu_sum);
+    #endif
+
+    #ifdef DEBUG
+    //compare the average
+    printf("GPU average: %f\n",avg);
+    printf("CPU average: %f\n",(float)cpu_sum/(float)np);
+    #endif
+
+    //calculate all other features on the CPU for this example
     sta[0] = avg;
     sta[1] = stddev(np, x, avg);
     sta[2] = abssum(np, x);

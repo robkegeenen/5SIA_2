@@ -28,8 +28,8 @@
 //(NOTE: you have to insert the appropriate macros if you write your own gpu code of course, see stafeatures.cu for an example)
 //#define CPU_ONLY
 
-//Comment to disable debug printing (in original code printing in the gpu_average function)
-#define DEBUG
+//Uncomment to enable debug printing (in original code printing in the gpu_average function)
+//#define DEBUG
 
 void read_data(int32_t x[CHANNELS][DATAPOINTS], int nc, int np);
 void run_channel(int np, int32_t *x, float *features);
