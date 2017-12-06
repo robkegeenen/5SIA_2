@@ -193,7 +193,7 @@ void stafeature(int np, int32_t *x, float *sta)
     //Because in this setup the amount of required shared memory is only known at runtime,
     //the number required shared memory bytes need to be passed as a 3rd argument to the kernel call later on
     //also see the remarks in the gpu_average code
-    int sharedMemBytes = np*sizeof(int32_t);
+    int sharedMemBytes = threadsPerBlock*sizeof(int32_t);
 
     //variable for holding return values of cuda functions
     cudaError_t err;
