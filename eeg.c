@@ -84,8 +84,8 @@ void run_channel(int np, int32_t *x, float *features)
     // Clean signal using butterworth
     #ifdef VERBOSE
     printf("    Butterworth filter...\n");
-    bw0_int(np, x, X);
     #endif
+    bw0_int(np, x, X);
 
     // 4 features: mean, std dev, abs sum, mean crossings
     #ifdef VERBOSE

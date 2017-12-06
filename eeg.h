@@ -22,7 +22,7 @@
 #define FS 100
 
 //Uncomment for verbose messaging
-#define VERBOSE
+//#define VERBOSE
 
 //Uncomment for a CPU only program
 //(NOTE: you have to insert the appropriate macros if you write your own gpu code of course, see stafeatures.cu for an example)
