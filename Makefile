@@ -101,10 +101,10 @@ endif
 
 #Target Rules
 check:output.txt reference.txt
-	@cmp output.txt reference.txt && echo "Output is Correct!" || echo "Output MISMATCH!!"
+	@cmp output.txt reference.txt && echo "Output is Correct!" || echo "Output MISMATCH!!";cat output.txt
 
 output.txt:$(EXE)
-	./$(EXE) | grep -I "Feature" | tee output.txt
+	./$(EXE) 2> output.txt
 
 run:$(EXE)
 	./(EXE)

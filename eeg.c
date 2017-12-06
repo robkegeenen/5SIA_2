@@ -37,7 +37,7 @@ int main(int argc, char *argv[]) {
 
     printf("\n");
 	for (i=0; i<FEATURE_LENGTH; i++)
-        printf("Feature %d: %.6f\n", i, favg[i]);
+        fprintf(stderr,"Feature %d: %.6f\n", i, favg[i]);
 
     return 0;
 }
