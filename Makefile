@@ -112,11 +112,6 @@ run:$(EXE)
 $(EXE):$(OBJS)
 	$(CC) $(OBJS) -L $(CUDA_LIB_PATH) -l$(CL_LIBS) $(LDFLAGS) $(EXTRA_LDFLAGS) -o $(EXE)
 
-#full benchmark
-#as a fail safe, benchmark will try to set the reference_hash to executable now
-run:$(EXE)
-	./$(EXE)
-
 %.o:%.cpp
 	$(CC) -MMD -MF $(subst .o,.d,$@) $(INCLUDES) -c $(CFLAGS) $< -o $@
 
