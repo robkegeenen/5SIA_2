@@ -96,6 +96,12 @@ DEPEND=$(OBJS:%.o=%.d)
 EXE=eeg
 
 #Target Rules
+check:output.txt reference.txt
+	cmp output.txt reference.txt
+
+output.txt:$(EXE)
+	./$(EXE) | grep -I "Feature" | tee output.txt
+
 $(EXE):$(OBJS)
 	$(CC) $(OBJS) -L $(CUDA_LIB_PATH) -l$(CL_LIBS) $(LDFLAGS) $(EXTRA_LDFLAGS) -o $(EXE)
 
@@ -115,7 +121,7 @@ run:$(EXE)
 	$(NVCC) $(NVCCFLAGS) $(EXTRA_NVCCFLAGS) $(GENCODE_FLAGS) $(INCLUDES) -c $< -o $@
 
 clean:
-	rm -rf $(OBJS) $(CU_OBJS) $(DEPEND) $(EXE) $(USER).zip
+	rm -rf $(OBJS) $(CU_OBJS) $(DEPEND) $(EXE) $(USER).zip output.txt
 
 zip:$(USER).zip
 $(USER).zip:clean
