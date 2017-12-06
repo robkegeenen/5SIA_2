@@ -97,7 +97,7 @@ EXE=eeg
 
 #Target Rules
 check:output.txt reference.txt
-	cmp output.txt reference.txt && echo "Output is Correct!" || echo "Ouput MISMATCH!!"
+	cmp output.txt reference.txt && echo "Output is Correct!" || echo "Output MISMATCH!!"
 
 output.txt:$(EXE)
 	./$(EXE) | grep -I "Feature" | tee output.txt
