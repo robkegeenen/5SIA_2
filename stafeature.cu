@@ -26,7 +26,7 @@ float average(int np, int32_t *x)
 }
 
 __global__
-void gpu_average(int32_t *x, float *y)
+void gpu_average(int32_t *x, int32_t *y)
 {
 
     // The id of this thread within our block
@@ -84,32 +84,6 @@ void gpu_average(int32_t *x, float *y)
 
         //each block has one summation
         y[blockIdx.x]=blockData[0];
-    }
-    __syncthreads();
-
-    //Finally one thread (globally) does the final summations and average calculation
-    //Note that we could have also chosen to do this on the CPU, if we copy back all the partial sums in y if there are only a couply of this that is probably faster
-    //If there are many partial results, it might be smarter to also sum this in a parallel fashion using a single threadblock, instead of using only 1 thread as we are doing here.
-    if(globalId==0){
-
-        //"allocate" a local register to hold the sum
-        int32_t sum=0;
-
-        //loop over all blocks in the grid, and sum their results from global mem into local register "sum"
-        for(unsigned int block=0;block<gridDim.x;block++)
-            sum+=y[block];
-
-        //divide by the total number of elements (equal the total number of threads)
-        float avg=((float)sum)/((float)(gridDim.x * blockDim.x));
-
-        #ifdef DEBUG
-        //example debugging: Total sum of all blocks and the found average
-        printf("Total Sum: %d\nAverage: %f\n",sum,avg);
-        #endif
-
-        //store the final average to global memory y[0]
-        //This result will be fetched by the CPU later
-        y[0]= avg;
     }
 
     //this will return the control to the CPU once all threads finish (reach this point)
@@ -207,11 +181,11 @@ void stafeature(int np, int32_t *x, float *sta)
     cudaCheckError(err);
 
     //also allocate room for the answer
-    float* device_y;
+    int32_t* device_blocksums;
     //Note that room is allocated in global memory for the sum of *each* threadblock
     //The final result will however be stored in the first position of this array
     //also, we allocate as floats here, but use as int32_t internally at some point which is not very pretty, but should work ;)
-    err=cudaMalloc(&device_y, numBlocks*sizeof(float));
+    err=cudaMalloc(&device_blocksums, numBlocks*sizeof(float));
     cudaCheckError(err);
 
     //Now copy array "x" from the CPU to the GPU
@@ -220,23 +194,43 @@ void stafeature(int np, int32_t *x, float *sta)
 
     //Compute the average on the GPU
 
-    gpu_average<<<numBlocks,threadsPerBlock, sharedMemBytes>>>(device_x, device_y);
+    gpu_average<<<numBlocks,threadsPerBlock, sharedMemBytes>>>(device_x, device_blocksums);
     //We use "peekatlasterror" since a kernel launch does not return a cudaError_t
     cudaCheckError(cudaPeekAtLastError());
 
     //copy result from GPU global memory to CPU memory
-    float avg;
+    int32_t blocksums[numBlocks];
     //NOTE: we only copy back the first element of the y array, since this hold the final average
-    err=cudaMemcpy(&avg,device_y, 1*sizeof(float), cudaMemcpyDeviceToHost);
+    err=cudaMemcpy(blocksums,device_blocksums, numBlocks*sizeof(float), cudaMemcpyDeviceToHost);
     cudaCheckError(err);
+
+    //Now add all the block sums on the CPU
+    //if you have many blocks, you might consider mapping this to a threadblock on the GPU of course
+    int32_t sum;
+    for(uint32_t blk=0;blk<numBlocks;blk++)
+        sum+=blocksums[blk];
+    float avg = (float)(sum)/(float)(np);
 
     //free the memory on the GPU
     //Hint: if you do not free the memory, the values will be preserved between multiple kernel calls!
     //For example, you could keep the calculated average in GPU memory, and use it in the calculation of stdev on the GPU
     err=cudaFree(device_x);
     cudaCheckError(err);
-    err=cudaFree(device_y);
+    err=cudaFree(device_blocksums);
     cudaCheckError(err);
+
+    printf("Average: %f\n",avg);
+    printf("CPU reference: %f\n",average(np, x));
+    int tsum=0;
+    for(int b=0;b<numBlocks;b++){
+        int sum=0;
+        for (int i=0;i<threadsPerBlock;i++)
+            sum+=x[b*threadsPerBlock+i];
+        printf("CPU Block %d sum: %d\n",b,sum);
+        tsum+=sum;
+    }
+    printf("CPU total sum: %d\n",tsum);
+
 
     //calculate all other features on the CPU for now
     sta[0] = avg;
