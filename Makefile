@@ -87,13 +87,17 @@ INCLUDES      := -I$(CUDA_INC_PATH) -I.
 #openCL libs
 CL_LIBS=OpenCL
 
-
 SRCS=$(wildcard *.c)
 CPP_SRCS=$(wildcard *.cpp)
 CU_SRCS=$(wildcard *.cu)
 OBJS=$(SRCS:.c=.o) $(CPP_SRCS:.cpp=.o) $(CU_SRCS:.cu=.o)
 DEPEND=$(OBJS:%.o=%.d)
 EXE=eeg
+
+#if there are any cuda sources, we need to add lcudart to the linker flags
+ifneq ($(CU_SRCS),)
+LDFLAGS+=-lcudart
+endif
 
 #Target Rules
 check:output.txt reference.txt
