@@ -107,7 +107,7 @@ output.txt:$(EXE)
 	./$(EXE) 2> output.txt
 
 run:$(EXE)
-	./(EXE)
+	./$(EXE)
 
 $(EXE):$(OBJS)
 	$(CC) $(OBJS) -L $(CUDA_LIB_PATH) -l$(CL_LIBS) $(LDFLAGS) $(EXTRA_LDFLAGS) -o $(EXE)
