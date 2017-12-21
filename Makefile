@@ -36,7 +36,8 @@ endif
 
 
 # Common binaries
-NVCC            ?= $(CUDA_BIN_PATH)/nvcc
+#NVCC            ?= $(CUDA_BIN_PATH)/nvcc
+NVCC            ?= nvcc
 CC 				=  g++
 
 # Extra user flags
