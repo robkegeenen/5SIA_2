@@ -19,6 +19,7 @@
 #define CHANNELS 23
 #define DATAPOINTS 256
 #define FEATURE_LENGTH 14
+#define FEATURE_TIME_LENGTH 5
 #define FS 100
 
 //Uncomment for verbose messaging
@@ -32,7 +33,7 @@
 //#define DEBUG
 
 void read_data(int32_t x[CHANNELS][DATAPOINTS], int nc, int np);
-void run_channel(int np, int32_t *x, float *features);
+void run_channel(int np, int32_t *x, float *features, clock_t *times, char **timenames);
 
 
 #ifdef __NVCC__
