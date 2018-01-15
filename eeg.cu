@@ -8,6 +8,11 @@
 
 #include "eeg.h"
 
+__global__
+void doNothingFucker() {
+  //Chillin''
+}
+
 int32_t randint(int32_t vmin, int32_t vmax)
 {
   return (vmin + (int32_t) (rand() / (RAND_MAX / ((uint32_t) (vmax - vmin + 1)) + 1)));
@@ -21,6 +26,8 @@ int main(int argc, char *argv[]) {
   float favg[FEATURE_LENGTH] = {0};
   int32_t x[CHANNELS][DATAPOINTS];
   uint32_t i, j;
+
+  doNothingFucker<<<1, 1>>>();
 
   read_data(x, CHANNELS, DATAPOINTS);
 
