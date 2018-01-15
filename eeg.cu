@@ -65,7 +65,6 @@ void read_data(int32_t x[CHANNELS][DATAPOINTS], int nc, int np)
   FILE *fp;
   char * line = NULL;
   size_t len = 0;
-  ssize_t read;
   int l, c;
 
   fp = fopen("EEG.csv", "r");
@@ -75,10 +74,10 @@ void read_data(int32_t x[CHANNELS][DATAPOINTS], int nc, int np)
   }
 
   // Skip the first line
-  read = getline(&line, &len, fp);
+  getline(&line, &len, fp);
 
   l = 0;
-  while ((l < np) && (read = getline(&line, &len, fp)) != -1) {
+  while ((l < np) && (getline(&line, &len, fp)) != -1) {
     char *tok;
     tok = strtok(line, ",");
     float v;

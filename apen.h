@@ -8,7 +8,7 @@
 #include <stdio.h>
 #include <time.h>
 
-double apen_correlation (int np, int32_t *x, unsigned int m, double r);
+//__global__ void apen_correlation (int np, int32_t *x, unsigned int m, double r, double *result);
 void apen(int np, int32_t *x, float *a, unsigned int m, double r);
 
 #endif
