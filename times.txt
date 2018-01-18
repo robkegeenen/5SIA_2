@@ -1,0 +1,6 @@
+
+Clock ticks for 'standard': 790, 0.000790 sec
+Clock ticks for 'peak 2 peak': 1533, 0.001533 sec
+Clock ticks for 'approximate entropy': 7200828, 7.200828 sec
+Clock ticks for 'hurst': 6788, 0.006788 sec
+Clock ticks for 'power spectral density': 88315, 0.088315 sec

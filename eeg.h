@@ -17,7 +17,8 @@
 #include "fft.h"
 
 #define CHANNELS 23
-#define DATAPOINTS 256
+//#define DATAPOINTS 32768
+#define DATAPOINTS 8192
 #define FEATURE_LENGTH 14
 #define FEATURE_TIME_LENGTH 5
 #define FS 100
