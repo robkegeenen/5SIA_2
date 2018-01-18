@@ -10,18 +10,11 @@ __device__ double atomicAdd(double* address, double val){
   return __longlong_as_double(old);
 }
 
-__global__
-void apen_correlation (int np, int32_t *x, unsigned int m, double r, double *result)
-{
-  unsigned int i = blockIdx.x;
-  unsigned int j = threadIdx.x;
+__global__ void apen_correlation (int np, int32_t *x, unsigned int m, double r, unsigned int *result, unsigned int length){
+  unsigned int globalId = (blockIdx.x * blockDim.x) + threadIdx.x;
+  unsigned int i = (globalId > (length * length)) ? 0 : (globalId / length);
+  unsigned int j = (globalId > (length * length)) ? 0 : (globalId % length);
   bool set;
-  __shared__ unsigned int count;
-  if(i == 0){
-    *result = 0;
-  }
-  count = 0;
-  __syncthreads();
   set = false;
   for(unsigned int k = 0; k < m; k++){
     if(abs(x[i + k] - x[j + k]) > r){
@@ -30,34 +23,35 @@ void apen_correlation (int np, int32_t *x, unsigned int m, double r, double *res
     }
   }
   if(!set){
-    atomicAdd(&count, 1);
-  }
-  __syncthreads();
-  if(j == 0){
-    atomicAdd(result, ((double)count) / ((double)np - m + 1));
+    atomicAdd(result, 1);
   }
 }
 
-void apen(int np, int32_t *x, float *a, unsigned int m, double r)
-{
-  double *dev_inter1, inter1, *dev_inter2, inter2;
+void apen(int np, int32_t *x, float *a, unsigned int m, double r, int blocksize){
+  unsigned int *dev_inter1, inter1, *dev_inter2, inter2;
   int32_t *dev_x;
   int length1 = np - (m + 0) + 1;
   int length2 = np - (m + 1) + 1;
+  unsigned int threads1 = (length1 > blocksize) ? blocksize : length1;
+  unsigned int blocks1 = (length1 > blocksize) ? (((length1 * length1) + blocksize - 1) / blocksize) : length1;
+  unsigned int threads2 = (length2 > blocksize) ? blocksize : length2;
+  unsigned int blocks2 = (length2 > blocksize) ? (((length2 * length2) + blocksize - 1) / blocksize) : length2;
   cudaStream_t stream1, stream2; //Only helps a little bit
   cudaCheckError(cudaStreamCreate(&stream1));
   cudaCheckError(cudaStreamCreate(&stream2));
   cudaCheckError(cudaMalloc(&dev_x, np*sizeof(int32_t)));
-  cudaCheckError(cudaMalloc(&dev_inter1, sizeof(double)));
-  cudaCheckError(cudaMalloc(&dev_inter2, sizeof(double)));
+  cudaCheckError(cudaMalloc(&dev_inter1, sizeof(unsigned int)));
+  cudaCheckError(cudaMalloc(&dev_inter2, sizeof(unsigned int)));
   cudaCheckError(cudaMemcpy(dev_x, x, np*sizeof(int32_t), cudaMemcpyHostToDevice));
-  apen_correlation<<<length1, length1, 0, stream1>>>(np, dev_x, m + 0, r, dev_inter1);
-  apen_correlation<<<length2, length2, 0, stream2>>>(np, dev_x, m + 1, r, dev_inter2);
+  cudaCheckError(cudaMemset(dev_inter1, 0x00, sizeof(unsigned int)));
+  cudaCheckError(cudaMemset(dev_inter2, 0x00, sizeof(unsigned int)));
+  apen_correlation<<<blocks1, threads1, 0, stream1>>>(np, dev_x, m + 0, r, dev_inter1, length1);
+  apen_correlation<<<blocks2, threads2, 0, stream2>>>(np, dev_x, m + 1, r, dev_inter2, length2);
   cudaCheckError(cudaDeviceSynchronize());
-  cudaCheckError(cudaMemcpy(&inter1, dev_inter1, sizeof(double), cudaMemcpyDeviceToHost));
-  cudaCheckError(cudaMemcpy(&inter2, dev_inter2, sizeof(double), cudaMemcpyDeviceToHost));
+  cudaCheckError(cudaMemcpy(&inter1, dev_inter1, sizeof(unsigned int), cudaMemcpyDeviceToHost));
+  cudaCheckError(cudaMemcpy(&inter2, dev_inter2, sizeof(unsigned int), cudaMemcpyDeviceToHost));
   cudaCheckError(cudaFree(dev_x));
   cudaCheckError(cudaFree(dev_inter1));
   cudaCheckError(cudaFree(dev_inter2));
-  *a = log((inter1 / ((double)length1)) / (inter2 / ((double)length2)));
+  *a = log(((double)inter1 / ((double)(length1 * length1))) / ((double)inter2 / ((double)(length2 * length2))));
 }

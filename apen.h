@@ -9,6 +9,6 @@
 #include <time.h>
 
 //__global__ void apen_correlation (int np, int32_t *x, unsigned int m, double r, double *result);
-void apen(int np, int32_t *x, float *a, unsigned int m, double r);
+void apen(int np, int32_t *x, float *a, unsigned int m, double r, int blocksize);
 
 #endif

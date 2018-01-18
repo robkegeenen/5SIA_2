@@ -33,7 +33,7 @@
 //#define DEBUG
 
 void read_data(int32_t x[CHANNELS][DATAPOINTS], int nc, int np);
-void run_channel(int np, int32_t *x, float *features, clock_t *times, char **timenames);
+void run_channel(int np, int32_t *x, float *features, clock_t *times, char **timenames, int blocksize);
 
 
 #ifdef __NVCC__
