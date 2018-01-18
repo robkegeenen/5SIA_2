@@ -35,7 +35,6 @@ int main(int argc, char *argv[]) {
   blocksize = (prop.maxThreadsPerBlock > prop.maxThreadsDim[0]) ? prop.maxThreadsDim[0] : prop.maxThreadsPerBlock;
   //printf("Blocksize: %d\n", blocksize);
 
-  
   doNothingFucker<<<1, 1>>>();
 
   read_data(x, CHANNELS, DATAPOINTS);
