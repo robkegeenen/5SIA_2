@@ -14,28 +14,28 @@ __global__
 void apen_correlation (int np, int32_t *x, unsigned int m, double r, double *result)
 {
   unsigned int i = blockIdx.x;
+  unsigned int j = threadIdx.x;
   bool set;
-  unsigned int count;
+  __shared__ unsigned int count;
   if(i == 0){
     *result = 0;
   }
-  //for(unsigned int i = 0; i <= np - m; i++){
   count = 0;
-  for(unsigned int j = 0; j <= np - m; j++){
-    set = false;
-    for(unsigned int k = 0; k < m; k++){
-      if(abs(x[i + k] - x[j + k]) > r){
-        set = true;
-        break;
-      }
-    }
-    if(!set){
-      count++;
+  __syncthreads();
+  set = false;
+  for(unsigned int k = 0; k < m; k++){
+    if(abs(x[i + k] - x[j + k]) > r){
+      set = true;
+      break;
     }
   }
-  //sum += ((double)count) / ((double)np - m + 1);
-  atomicAdd(result, ((double)count) / ((double)np - m + 1));
-  //}
+  if(!set){
+    atomicAdd(&count, 1);
+  }
+  __syncthreads();
+  if(j == 0){
+    atomicAdd(result, ((double)count) / ((double)np - m + 1));
+  }
 }
 
 void apen(int np, int32_t *x, float *a, unsigned int m, double r)
@@ -44,12 +44,15 @@ void apen(int np, int32_t *x, float *a, unsigned int m, double r)
   int32_t *dev_x;
   int length1 = np - (m + 0) + 1;
   int length2 = np - (m + 1) + 1;
+  cudaStream_t stream1, stream2; //Only helps a little bit
+  cudaCheckError(cudaStreamCreate(&stream1));
+  cudaCheckError(cudaStreamCreate(&stream2));
   cudaCheckError(cudaMalloc(&dev_x, np*sizeof(int32_t)));
   cudaCheckError(cudaMalloc(&dev_inter1, sizeof(double)));
   cudaCheckError(cudaMalloc(&dev_inter2, sizeof(double)));
   cudaCheckError(cudaMemcpy(dev_x, x, np*sizeof(int32_t), cudaMemcpyHostToDevice));
-  apen_correlation<<<length1, 1>>>(np, dev_x, m + 0, r, dev_inter1);
-  apen_correlation<<<length2, 1>>>(np, dev_x, m + 1, r, dev_inter2);
+  apen_correlation<<<length1, length1, 0, stream1>>>(np, dev_x, m + 0, r, dev_inter1);
+  apen_correlation<<<length2, length2, 0, stream2>>>(np, dev_x, m + 1, r, dev_inter2);
   cudaCheckError(cudaDeviceSynchronize());
   cudaCheckError(cudaMemcpy(&inter1, dev_inter1, sizeof(double), cudaMemcpyDeviceToHost));
   cudaCheckError(cudaMemcpy(&inter2, dev_inter2, sizeof(double), cudaMemcpyDeviceToHost));
