@@ -128,7 +128,9 @@ void run_channel(int np, int32_t *x, float *features, clock_t *times, char **tim
   printf("    Approximate Entropy feature...\n");
 #endif
   clk = clock();
+  printf("##########\n");
   apen(np, X, &features[6], 3, 0.2);
+  printf("##########\n");
   times[2] = clock() - clk;
   timenames[2] = (char*)"approximate entropy";
 
