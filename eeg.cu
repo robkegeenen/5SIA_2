@@ -26,7 +26,16 @@ int main(int argc, char *argv[]) {
   float favg[FEATURE_LENGTH] = {0};
   int32_t x[CHANNELS][DATAPOINTS];
   uint32_t i, j;
+  int devnum;
+  cudaDeviceProp prop;
+  int blocksize;
 
+  cudaCheckError(cudaGetDevice(&devnum));
+  cudaCheckError(cudaGetDeviceProperties(&prop, devnum));
+  blocksize = (prop.maxThreadsPerBlock > prop.maxThreadsDim[0]) ? prop.maxThreadsDim[0] : prop.maxThreadsPerBlock;
+  //printf("Blocksize: %d\n", blocksize);
+
+  
   doNothingFucker<<<1, 1>>>();
 
   read_data(x, CHANNELS, DATAPOINTS);
@@ -35,7 +44,7 @@ int main(int argc, char *argv[]) {
 #ifdef VERBOSE
     printf("Running channel %d...\n", i);
 #endif
-    run_channel(DATAPOINTS, x[i], features[i], times[i], timenames);
+    run_channel(DATAPOINTS, x[i], features[i], times[i], timenames, blocksize);
   }
 
   // Averaging channels
@@ -93,7 +102,7 @@ void read_data(int32_t x[CHANNELS][DATAPOINTS], int nc, int np)
 
 }
 
-void run_channel(int np, int32_t *x, float *features, clock_t *times, char **timenames)
+void run_channel(int np, int32_t *x, float *features, clock_t *times, char **timenames, int blocksize)
 {
   // Butterworth returns np + 1 samples
   int32_t *X = (int32_t *) malloc((np + 1) * sizeof(int32_t));
@@ -129,7 +138,7 @@ void run_channel(int np, int32_t *x, float *features, clock_t *times, char **tim
 #endif
   clk = clock();
   printf("##########\n");
-  apen(np, X, &features[6], 3, 0.2);
+  apen(np, X, &features[6], 3, 0.2, blocksize);
   printf("##########\n");
   times[2] = clock() - clk;
   timenames[2] = (char*)"approximate entropy";
