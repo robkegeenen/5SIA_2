@@ -11,10 +11,13 @@ __device__ double atomicAdd(double* address, double val){
 }
 
 __global__ void apen_correlation (int np, int32_t *x, unsigned int m, double r, unsigned int *result, unsigned int length){
-  unsigned int globalId = (blockIdx.x * blockDim.x) + threadIdx.x;
-  unsigned int i = (globalId > (length * length)) ? 0 : (globalId / length);
-  unsigned int j = (globalId > (length * length)) ? 0 : (globalId % length);
   bool set;
+  unsigned int globalId = (blockIdx.x * blockDim.x) + threadIdx.x;
+  unsigned int i = globalId / length;
+  unsigned int j = globalId % length;
+  if((i >= length) || (j >= length)){
+    return;
+  }
   set = false;
   for(unsigned int k = 0; k < m; k++){
     if(abs(x[i + k] - x[j + k]) > r){
